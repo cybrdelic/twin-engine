@@ -1,5 +1,0 @@
-{
-  "name": "Copy of The Unified Primitive",
-  "description": "A demonstration of a unified rendering primitive that continuously morphs between Triangles, Splats, Points, and Voxels using a single parameterized spatial distribution.",
-  "requestFramePermissions": []
-}

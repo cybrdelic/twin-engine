@@ -1,20 +1,34 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Twin Engine
 
-# Run and deploy your AI Studio app
+This repository has been replaced with the computational hardware, drone, path-tracing, digital-twin, and mechatronics code developed in the associated project.
 
-This contains everything you need to run your app locally.
+## Source bundle
 
-View your app in AI Studio: https://ai.studio/apps/drive/1aGYwaw9ogkufN0XabdbKclMENwfqcWO4
+The complete browsable source tree is packaged in `twin-engine-source.tar.gz`.
 
-## Run Locally
+Extract it from the repository root:
 
-**Prerequisites:**  Node.js
+```bash
+mkdir -p source
+tar -xzf twin-engine-source.tar.gz -C source
+```
 
+The source bundle contains:
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- AV-7 Swift drone structural and material/detail generators
+- custom C++ CPU path tracer
+- launch, convergence, and render tooling
+- robotic-arm and camera-mount hardware generators
+- reduced-order digital-twin dynamics, control, sensor, scenario, and test code
+- unified mechatronics and shoulder-cartridge generators
+- engineering documentation and compact manifests
+
+Large PFM caches, rendered frame sequences, duplicated ZIP archives, generated videos, and known-invalid prototype outputs are intentionally excluded.
+
+## Backup
+
+The repository state that existed before this replacement is preserved on branch `backup/pre-conversation-overwrite`.
+
+## Engineering boundary
+
+This codebase contains research and engineering baselines, not certified production hardware.
