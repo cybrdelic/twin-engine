@@ -1,0 +1,60 @@
+name: Fetch official Voron 2.4 CAD
+
+on:
+  push:
+    branches:
+      - feature/voron24-official-cad
+    paths:
+      - .github/workflows/fetch-voron24-cad.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch-cad:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout twin-engine
+        uses: actions/checkout@v4
+
+      - name: Fetch official Voron 2.4 repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch Voron2.4 \
+            https://github.com/VoronDesign/Voron-2.git \
+            "$RUNNER_TEMP/Voron-2"
+
+      - name: Inventory and package CAD assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/Voron-2"
+          OUT="$RUNNER_TEMP/voron24-official-cad"
+          mkdir -p "$OUT"
+
+          for dir in CAD STLs DXFs; do
+            if [ -d "$SRC/$dir" ]; then
+              cp -a "$SRC/$dir" "$OUT/$dir"
+            fi
+          done
+
+          if [ -f "$SRC/LICENSE" ]; then cp "$SRC/LICENSE" "$OUT/"; fi
+          if [ -f "$SRC/README.md" ]; then cp "$SRC/README.md" "$OUT/"; fi
+
+          git -C "$SRC" rev-parse HEAD > "$OUT/UPSTREAM_COMMIT.txt"
+          printf '%s\n' 'https://github.com/VoronDesign/Voron-2' > "$OUT/UPSTREAM_REPOSITORY.txt"
+          find "$OUT" -type f -printf '%P\n' | sort > "$OUT/MANIFEST.txt"
+          echo "Packaged $(wc -l < "$OUT/MANIFEST.txt") files"
+          du -sh "$OUT"
+
+      - name: Upload official CAD bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: voron24-official-cad
+          path: ${{ runner.temp }}/voron24-official-cad
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 30
