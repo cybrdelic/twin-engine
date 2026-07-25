@@ -35,8 +35,8 @@ try:
     scene.render.resolution_y = 825
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
-    scene.view_settings.look = "Medium High Contrast"
     scene.view_settings.exposure = 0.2
+    scene.view_settings.gamma = 1.0
     scene.world.color = (0.012, 0.016, 0.024)
 
     def make_material(name, base_color, metallic, roughness):
