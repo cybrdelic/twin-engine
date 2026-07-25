@@ -37,13 +37,33 @@ jobs:
           unzip -q "$RUNNER_TEMP/Voron-2/CAD/Voron_2.4r2_Assembly_STEP.zip" -d "$RUNNER_TEMP/voron-step"
 
       - name: Tessellate STEP solids with FreeCAD
+        id: tessellate
+        continue-on-error: true
         env:
           STEP_FILE: ${{ runner.temp }}/voron-step/Voron_2.4r2_Assembly.step
           MESH_DIR: ${{ runner.temp }}/voron-meshes
         run: |
-          set -euo pipefail
-          mkdir -p "$MESH_DIR"
-          xvfb-run -a freecadcmd -c "exec(open('tools/voron24/tessellate_step.py').read())"
+          set +e
+          mkdir -p "$MESH_DIR" "$RUNNER_TEMP/voron-diagnostics"
+          xvfb-run -a freecadcmd -c "exec(open('tools/voron24/tessellate_step.py').read())" 2>&1 | tee "$RUNNER_TEMP/voron-diagnostics/freecad.log"
+          status=${PIPESTATUS[0]}
+          echo "$status" > "$RUNNER_TEMP/voron-diagnostics/freecad-exit-code.txt"
+          env | sort > "$RUNNER_TEMP/voron-diagnostics/environment.txt"
+          find "$MESH_DIR" -maxdepth 2 -type f -printf '%P %s bytes\n' | sort > "$RUNNER_TEMP/voron-diagnostics/generated-files.txt"
+          exit "$status"
+
+      - name: Upload FreeCAD diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voron24-freecad-diagnostics
+          path: ${{ runner.temp }}/voron-diagnostics
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Stop after tessellation failure
+        if: steps.tessellate.outcome != 'success'
+        run: exit 1
 
       - name: Render hero and turntable with Blender
         env:
