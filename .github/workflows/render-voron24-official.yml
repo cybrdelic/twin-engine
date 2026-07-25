@@ -1,0 +1,107 @@
+name: Render official Voron 2.4 assembly
+
+on:
+  push:
+    branches:
+      - feature/voron24-official-cad
+    paths:
+      - .github/workflows/render-voron24-official.yml
+      - tools/voron24/**
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/render-voron24-official.yml
+      - tools/voron24/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tessellate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install CadQuery
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install cadquery
+      - name: Fetch official Voron 2.4 CAD
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch Voron2.4 https://github.com/VoronDesign/Voron-2.git "$RUNNER_TEMP/Voron-2"
+          unzip -q "$RUNNER_TEMP/Voron-2/CAD/Voron_2.4r2_Assembly_STEP.zip" -d "$RUNNER_TEMP/voron-step"
+      - name: Tessellate STEP assembly with CadQuery OCP
+        env:
+          STEP_FILE: ${{ runner.temp }}/voron-step/Voron_2.4r2_Assembly.step
+          MESH_DIR: ${{ runner.temp }}/voron-meshes
+        run: |
+          set -euo pipefail
+          mkdir -p "$MESH_DIR"
+          python3 tools/voron24/tessellate_cadquery.py
+          test -s "$MESH_DIR/voron24_assembly.stl"
+          test -s "$MESH_DIR/manifest.json"
+      - name: Upload tessellated official assembly
+        uses: actions/upload-artifact@v4
+        with:
+          name: voron24-tessellated-assembly
+          path: ${{ runner.temp }}/voron-meshes
+          if-no-files-found: error
+          compression-level: 1
+          retention-days: 30
+
+  render:
+    needs: tessellate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Blender
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends blender
+      - name: Download tessellated official assembly
+        uses: actions/download-artifact@v4
+        with:
+          name: voron24-tessellated-assembly
+          path: ${{ runner.temp }}/voron-meshes
+      - name: Render verified hero
+        id: blender
+        continue-on-error: true
+        env:
+          MESH_DIR: ${{ runner.temp }}/voron-meshes
+          OUTPUT_DIR: ${{ runner.temp }}/voron-render
+        run: |
+          set +e
+          mkdir -p "$OUTPUT_DIR" "$RUNNER_TEMP/blender-diagnostics"
+          blender -b --python-exit-code 2 --python tools/voron24/render_voron.py 2>&1 | tee "$RUNNER_TEMP/blender-diagnostics/blender.log"
+          status=${PIPESTATUS[0]}
+          find "$OUTPUT_DIR" -maxdepth 2 -type f -printf '%P %s bytes\n' | sort > "$RUNNER_TEMP/blender-diagnostics/generated-files.txt"
+          echo "$status" > "$RUNNER_TEMP/blender-diagnostics/exit-code.txt"
+          exit "$status"
+      - name: Upload Blender diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: voron24-blender-diagnostics
+          path: ${{ runner.temp }}/blender-diagnostics
+          if-no-files-found: error
+          retention-days: 7
+      - name: Stop after Blender failure
+        if: steps.blender.outcome != 'success'
+        run: exit 1
+      - name: Verify and package output
+        run: |
+          set -euo pipefail
+          test -s "$RUNNER_TEMP/voron-render/voron24_official_hero.png"
+          mkdir -p "$RUNNER_TEMP/voron24-output"
+          cp -a "$RUNNER_TEMP/voron-render/." "$RUNNER_TEMP/voron24-output/"
+          cp "$RUNNER_TEMP/voron-meshes/manifest.json" "$RUNNER_TEMP/voron24-output/mesh-manifest.json"
+          find "$RUNNER_TEMP/voron24-output" -type f -printf '%P %s bytes\n' | sort
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voron24-official-render
+          path: ${{ runner.temp }}/voron24-output
+          if-no-files-found: error
+          compression-level: 4
+          retention-days: 30
