@@ -37,6 +37,8 @@ try:
     scene.render.image_settings.file_format = "PNG"
     scene.view_settings.exposure = 0.2
     scene.view_settings.gamma = 1.0
+    if scene.world is None:
+        scene.world = bpy.data.worlds.new("Voron Studio World")
     scene.world.color = (0.012, 0.016, 0.024)
 
     def make_material(name, base_color, metallic, roughness):
