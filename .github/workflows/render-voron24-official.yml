@@ -1,0 +1,70 @@
+name: Render official Voron 2.4 assembly
+
+on:
+  push:
+    branches:
+      - feature/voron24-official-cad
+    paths:
+      - .github/workflows/render-voron24-official.yml
+      - tools/voron24/**
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/render-voron24-official.yml
+      - tools/voron24/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install CAD and rendering tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends freecad blender ffmpeg xvfb
+
+      - name: Fetch official Voron 2.4 CAD
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch Voron2.4 https://github.com/VoronDesign/Voron-2.git "$RUNNER_TEMP/Voron-2"
+          unzip -q "$RUNNER_TEMP/Voron-2/CAD/Voron_2.4r2_Assembly_STEP.zip" -d "$RUNNER_TEMP/voron-step"
+
+      - name: Tessellate STEP solids with FreeCAD
+        env:
+          STEP_FILE: ${{ runner.temp }}/voron-step/Voron_2.4r2_Assembly.step
+          MESH_DIR: ${{ runner.temp }}/voron-meshes
+        run: |
+          mkdir -p "$MESH_DIR"
+          xvfb-run -a FreeCADCmd tools/voron24/tessellate_step.py
+
+      - name: Render hero and turntable with Blender
+        env:
+          MESH_DIR: ${{ runner.temp }}/voron-meshes
+          OUTPUT_DIR: ${{ runner.temp }}/voron-render
+        run: |
+          mkdir -p "$OUTPUT_DIR"
+          blender -b --python tools/voron24/render_voron.py
+
+      - name: Package outputs
+        run: |
+          mkdir -p "$RUNNER_TEMP/voron24-output"
+          cp -a "$RUNNER_TEMP/voron-render/." "$RUNNER_TEMP/voron24-output/"
+          cp "$RUNNER_TEMP/voron-meshes/manifest.json" "$RUNNER_TEMP/voron24-output/mesh-manifest.json"
+          cp "$RUNNER_TEMP/Voron-2/LICENSE" "$RUNNER_TEMP/voron24-output/VORON_LICENSE"
+          git -C "$RUNNER_TEMP/Voron-2" rev-parse HEAD > "$RUNNER_TEMP/voron24-output/UPSTREAM_COMMIT.txt"
+          find "$RUNNER_TEMP/voron24-output" -maxdepth 2 -type f -printf '%P %s bytes\n' | sort
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voron24-official-render
+          path: ${{ runner.temp }}/voron24-output
+          if-no-files-found: error
+          compression-level: 4
+          retention-days: 30
