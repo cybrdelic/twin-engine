@@ -28,7 +28,9 @@ jobs:
       - name: Install CAD and rendering tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends freecad blender ffmpeg xvfb
+          sudo apt-get install -y --no-install-recommends blender ffmpeg python3-pip
+          python3 -m pip install --upgrade pip
+          python3 -m pip install cadquery
 
       - name: Fetch official Voron 2.4 CAD
         run: |
@@ -36,7 +38,7 @@ jobs:
           git clone --depth 1 --branch Voron2.4 https://github.com/VoronDesign/Voron-2.git "$RUNNER_TEMP/Voron-2"
           unzip -q "$RUNNER_TEMP/Voron-2/CAD/Voron_2.4r2_Assembly_STEP.zip" -d "$RUNNER_TEMP/voron-step"
 
-      - name: Tessellate STEP solids with FreeCAD
+      - name: Tessellate STEP assembly with CadQuery OCP
         id: tessellate
         continue-on-error: true
         env:
@@ -45,18 +47,17 @@ jobs:
         run: |
           set +e
           mkdir -p "$MESH_DIR" "$RUNNER_TEMP/voron-diagnostics"
-          xvfb-run -a freecadcmd -c "exec(open('tools/voron24/tessellate_step.py').read())" 2>&1 | tee "$RUNNER_TEMP/voron-diagnostics/freecad.log"
+          python3 tools/voron24/tessellate_cadquery.py 2>&1 | tee "$RUNNER_TEMP/voron-diagnostics/cadquery.log"
           status=${PIPESTATUS[0]}
-          echo "$status" > "$RUNNER_TEMP/voron-diagnostics/freecad-exit-code.txt"
-          env | sort > "$RUNNER_TEMP/voron-diagnostics/environment.txt"
+          echo "$status" > "$RUNNER_TEMP/voron-diagnostics/cadquery-exit-code.txt"
           find "$MESH_DIR" -maxdepth 2 -type f -printf '%P %s bytes\n' | sort > "$RUNNER_TEMP/voron-diagnostics/generated-files.txt"
           exit "$status"
 
-      - name: Upload FreeCAD diagnostics
+      - name: Upload CAD diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: voron24-freecad-diagnostics
+          name: voron24-cad-diagnostics
           path: ${{ runner.temp }}/voron-diagnostics
           if-no-files-found: error
           retention-days: 7
