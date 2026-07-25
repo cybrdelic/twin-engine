@@ -41,14 +41,16 @@ jobs:
           STEP_FILE: ${{ runner.temp }}/voron-step/Voron_2.4r2_Assembly.step
           MESH_DIR: ${{ runner.temp }}/voron-meshes
         run: |
+          set -euo pipefail
           mkdir -p "$MESH_DIR"
-          xvfb-run -a FreeCADCmd tools/voron24/tessellate_step.py
+          xvfb-run -a freecadcmd -c "exec(open('tools/voron24/tessellate_step.py').read())"
 
       - name: Render hero and turntable with Blender
         env:
           MESH_DIR: ${{ runner.temp }}/voron-meshes
           OUTPUT_DIR: ${{ runner.temp }}/voron-render
         run: |
+          set -euo pipefail
           mkdir -p "$OUTPUT_DIR"
           blender -b --python tools/voron24/render_voron.py
 
